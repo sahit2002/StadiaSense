@@ -47,8 +47,6 @@ const iconMap = {
 };
 
 function init() {
-  _sel('splash-title').textContent = teamConfig.name;
-  
   // Settings Handlers
   _sel('settings-btn').addEventListener('click', () => settingsModal.setAttribute('aria-hidden', 'false'));
   _sel('close-modal-btn').addEventListener('click', () => settingsModal.setAttribute('aria-hidden', 'true'));
