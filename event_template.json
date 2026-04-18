@@ -1,0 +1,140 @@
+{
+  "imageUrl": "https://picsum.photos/seed/example/800/600",
+  "zones": {
+    "north": {
+      "id": "north",
+      "name": "North Stand",
+      "density": "low"
+    },
+    "south": {
+      "id": "south",
+      "name": "South Stand",
+      "density": "high"
+    },
+    "east": {
+      "id": "east",
+      "name": "East Stand",
+      "density": "med"
+    },
+    "west": {
+      "id": "west",
+      "name": "West Stand",
+      "density": "low"
+    }
+  },
+  "tickets": {
+    "VIP-AA123": {
+      "name": "Jane Doe",
+      "role": "vip",
+      "seat": {
+        "zone": "east",
+        "label": "Suite 14B"
+      },
+      "itinerary": [
+        {
+          "time": "17:00",
+          "event": "Priority Entry",
+          "status": "completed",
+          "zone": "south"
+        },
+        {
+          "time": "18:00",
+          "event": "VIP Reception",
+          "status": "active",
+          "zone": "east"
+        },
+        {
+          "time": "20:00",
+          "event": "Main Event Start",
+          "status": "upcoming",
+          "zone": "east"
+        }
+      ]
+    },
+    "FAN-456": {
+      "name": "Mark Johnson",
+      "role": "fan",
+      "seat": {
+        "zone": "west",
+        "label": "Block 212, Row F"
+      },
+      "itinerary": [
+        {
+          "time": "18:00",
+          "event": "Gates Open",
+          "status": "completed",
+          "zone": "north"
+        },
+        {
+          "time": "19:45",
+          "event": "Match Start",
+          "status": "upcoming",
+          "zone": "west"
+        }
+      ]
+    },
+    "STAFF-001": {
+      "name": "Security Lead Collins",
+      "role": "staff",
+      "seat": {
+        "zone": "south",
+        "label": "Control Room Alpha"
+      },
+      "itinerary": [
+        {
+          "time": "15:00",
+          "event": "Briefing",
+          "status": "completed",
+          "zone": "west"
+        },
+        {
+          "time": "18:00",
+          "event": "Gate Control (South)",
+          "status": "active",
+          "zone": "south"
+        }
+      ]
+    }
+  },
+  "facilities": [
+    {
+      "id": "f1",
+      "name": "Burger Stand",
+      "type": "food",
+      "zone": "north",
+      "waitTime": 5
+    },
+    {
+      "id": "r1",
+      "name": "North Restroom",
+      "type": "restroom",
+      "zone": "north",
+      "waitTime": 2
+    },
+    {
+      "id": "e1",
+      "name": "Gate N",
+      "type": "exit",
+      "zone": "north",
+      "waitTime": 0
+    },
+    {
+      "id": "t1",
+      "name": "Metro (Red Line)",
+      "type": "transport",
+      "zone": "north",
+      "gate": "Gate N"
+    },
+    {
+      "id": "v1",
+      "name": "VIP Lounge North",
+      "type": "lounge",
+      "zone": "north",
+      "waitTime": 0
+    }
+  ],
+  "alerts": [
+    "Gates open in 30 minutes! Please prepare for security checks.",
+    "Expect heavy traffic near the South Stand exits post-event."
+  ]
+}

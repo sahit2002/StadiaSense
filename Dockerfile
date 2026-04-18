@@ -1,17 +1,17 @@
-# Use a lightweight Alpine NGINX image
-FROM nginx:alpine
+# Use a lightweight Python image
+FROM python:3.11-slim
 
-# Remove default NGINX configurations
-RUN rm /etc/nginx/conf.d/default.conf
+WORKDIR /app
 
-# Copy custom NGINX configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy requirement and install
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the static web application files into NGINX's serving directory
-COPY . /usr/share/nginx/html/
+# Copy all files
+COPY . .
 
-# Expose port (Cloud Run defaults to listening on 8080)
+# Expose port
 EXPOSE 8080
 
-# Start NGINX
-CMD ["nginx", "-g", "daemon off;"]
+# Start Uvicorn
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8080"]

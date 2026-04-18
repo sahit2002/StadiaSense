@@ -14,7 +14,8 @@ const [sr, sg, sb] = hexToRgb(teamConfig.secondary);
 document.documentElement.style.setProperty('--theme-primary-alpha', `rgba(${r}, ${g}, ${b}, 0.2)`);
 document.documentElement.style.setProperty('--theme-secondary-alpha', `rgba(${sr}, ${sg}, ${sb}, 0.2)`);
 
-const data = window.mockData;
+let data = null;
+let currentEventId = null;
 
 // DOM Elements
 const _sel = id => document.getElementById(id);
@@ -46,7 +47,185 @@ const iconMap = {
   schedule: `<svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zm-7-5h5v5h-5z"/></svg>`
 };
 
-function init() {
+async function init() {
+  // Taskbar Tab Switching
+  const tabDiscover = _sel('tab-discover');
+  const tabOrganizer = _sel('tab-organizer');
+  const viewDiscover = _sel('view-discover');
+  const viewOrganizer = _sel('view-organizer');
+
+  tabDiscover.addEventListener('click', () => {
+    tabDiscover.classList.add('active'); tabOrganizer.classList.remove('active');
+    viewDiscover.classList.add('active'); viewOrganizer.classList.remove('active');
+  });
+
+  tabOrganizer.addEventListener('click', () => {
+    tabOrganizer.classList.add('active'); tabDiscover.classList.remove('active');
+    viewOrganizer.classList.add('active'); viewDiscover.classList.remove('active');
+  });
+
+  // Load events into Grid
+  const eventsGrid = _sel('events-grid');
+  try {
+    const res = await fetch('/api/events');
+    const events = await res.json();
+    eventsGrid.innerHTML = events.map(e => `
+      <div class="event-card" style="background-image: url('${e.imageUrl}')">
+        <div class="event-hover-overlay">
+          <button class="join-event-btn tap-target" data-event-id="${e.id}">Register / Join</button>
+        </div>
+        <div class="event-card-content">
+          <h3>${e.name}</h3>
+        </div>
+      </div>
+    `).join('');
+
+    document.querySelectorAll('.join-event-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const val = e.target.getAttribute('data-event-id');
+        try {
+          const res = await fetch('/api/events/' + val);
+          data = await res.json();
+          currentEventId = val;
+          checkSession();
+        } catch(err) {
+          _sel('landing-msg-discover').textContent = "Failed to load event data.";
+        }
+      });
+    });
+  } catch(err) {
+    _sel('landing-msg-discover').textContent = "Failed to load events from backend.";
+  }
+
+  _sel('upload-event-btn').addEventListener('click', async () => {
+    const name = _sel('new-event-name').value.trim();
+    const image = _sel('new-event-image').value.trim();
+    let jsonStr = _sel('new-event-json').value.trim();
+    if(!name || !jsonStr) { _sel('landing-msg-organizer').textContent = "Please provide name and JSON."; return; }
+    let parsed;
+    try { parsed = JSON.parse(jsonStr); } catch(e) { _sel('landing-msg-organizer').textContent = "Invalid JSON format."; return; }
+    if(image) parsed.imageUrl = image;
+    
+    try {
+      const res = await fetch('/api/events', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name, data: parsed})
+      });
+      if(res.ok) {
+        const d = await res.json();
+        _sel('landing-msg-organizer').style.color = 'var(--wait-good)';
+        alert(`CRITICAL: Event Published.\n\nYour unique Host Key is: ${d.host_key}\n\nPlease save this secure string in your records! You will not be able to update or drop your event without it.`);
+        _sel('landing-msg-organizer').textContent = "Event successfully uploaded! Refreshing list...";
+        setTimeout(() => location.reload(), 1500);
+      }
+    } catch(err) {
+      _sel('landing-msg-organizer').textContent = "Upload failed.";
+    }
+  });
+
+  _sel('mode-create-btn').addEventListener('click', () => {
+    _sel('mode-create-btn').classList.add('active');
+    _sel('mode-manage-btn').classList.remove('active');
+    _sel('manage-banner').style.display = 'none';
+    _sel('create-actions').style.display = 'block';
+    _sel('manage-actions').style.display = 'none';
+    _sel('new-event-name').value = '';
+    _sel('new-event-image').value = '';
+    _sel('new-event-json').value = '';
+    _sel('landing-msg-organizer').textContent = '';
+  });
+
+  _sel('mode-manage-btn').addEventListener('click', () => {
+    _sel('mode-manage-btn').classList.add('active');
+    _sel('mode-create-btn').classList.remove('active');
+    _sel('manage-banner').style.display = 'block';
+    _sel('create-actions').style.display = 'none';
+    _sel('manage-actions').style.display = 'none';
+    _sel('new-event-name').value = '';
+    _sel('new-event-image').value = '';
+    _sel('new-event-json').value = '';
+    _sel('landing-msg-organizer').textContent = '';
+  });
+
+  let currentManageId = null;
+  _sel('load-event-btn').addEventListener('click', async () => {
+    const hostKey = _sel('manage-host-key').value.trim();
+    if(!hostKey) return;
+    try {
+      const res = await fetch('/api/events/manage/' + encodeURIComponent(hostKey));
+      if(!res.ok) throw new Error();
+      const payload = await res.json();
+      currentManageId = payload.id;
+      const eventData = payload.data;
+      
+      _sel('new-event-name').value = "Loading Event ID: " + currentManageId;
+      _sel('new-event-json').value = JSON.stringify(eventData, null, 2);
+      if(eventData.imageUrl) _sel('new-event-image').value = eventData.imageUrl;
+      
+      _sel('create-actions').style.display = 'none';
+      _sel('manage-actions').style.display = 'flex';
+      _sel('landing-msg-organizer').textContent = "Event Configuration Loaded. Awaiting modifications...";
+      _sel('landing-msg-organizer').style.color = "var(--theme-primary)";
+    } catch(err) {
+      _sel('landing-msg-organizer').style.color = "var(--wait-bad)";
+      _sel('landing-msg-organizer').textContent = "Failed to locate event via sequence key.";
+    }
+  });
+
+  _sel('update-event-btn').addEventListener('click', async () => {
+    const name = _sel('new-event-name').value.trim();
+    const image = _sel('new-event-image').value.trim();
+    let jsonStr = _sel('new-event-json').value.trim();
+    const eventId = currentManageId;
+    const hostKey = _sel('manage-host-key').value.trim();
+    
+    if(!name || !jsonStr || !hostKey || !eventId) { _sel('landing-msg-organizer').style.color = "var(--wait-bad)"; _sel('landing-msg-organizer').textContent = "Ensure Host Key and payload is present."; return; }
+    
+    let parsed;
+    try { parsed = JSON.parse(jsonStr); } catch(e) { _sel('landing-msg-organizer').textContent = "Invalid JSON architecture."; return; }
+    if(image) parsed.imageUrl = image;
+    
+    try {
+      const res = await fetch(`/api/events/${eventId}`, {
+        method: 'PUT', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name, data: parsed, host_key: hostKey})
+      });
+      if(res.ok) {
+        _sel('landing-msg-organizer').style.color = 'var(--wait-good)';
+        _sel('landing-msg-organizer').textContent = "Configuration successfully updated! Validating...";
+        setTimeout(() => location.reload(), 1500);
+      } else {
+         _sel('landing-msg-organizer').style.color = "var(--wait-bad)";
+         _sel('landing-msg-organizer').textContent = "Host Key validation failed!";
+      }
+    } catch(err) {
+      _sel('landing-msg-organizer').textContent = "Server rejection.";
+    }
+  });
+
+  _sel('delete-event-btn').addEventListener('click', async () => {
+    const eventId = currentManageId;
+    const hostKey = _sel('manage-host-key').value.trim();
+    if(!hostKey || !eventId) { _sel('landing-msg-organizer').style.color = "var(--wait-bad)"; _sel('landing-msg-organizer').textContent = "Missing Host Key."; return; }
+    if(!confirm('Are you certain you want to permanently drop this event configuration?')) return;
+    
+    try {
+      const res = await fetch(`/api/events/${eventId}?host_key=${encodeURIComponent(hostKey)}`, {
+        method: 'DELETE'
+      });
+      if(res.ok) {
+        _sel('landing-msg-organizer').style.color = 'var(--wait-bad)';
+        _sel('landing-msg-organizer').textContent = "Event dropped gracefully. Refreshing grid...";
+        setTimeout(() => location.reload(), 1500);
+      } else {
+         _sel('landing-msg-organizer').style.color = "var(--wait-bad)";
+         _sel('landing-msg-organizer').textContent = "Host Key verification failed.";
+      }
+    } catch(err) {
+      _sel('landing-msg-organizer').textContent = "Operation failed.";
+    }
+  });
+
   // Settings Handlers
   _sel('settings-btn').addEventListener('click', () => settingsModal.setAttribute('aria-hidden', 'false'));
   _sel('close-modal-btn').addEventListener('click', () => settingsModal.setAttribute('aria-hidden', 'true'));
@@ -59,9 +238,35 @@ function init() {
   _sel('close-timesheet-btn').addEventListener('click', () => timesheetModal.setAttribute('aria-hidden', 'true'));
 
   // Auth Handlers
+  _sel('landing-brand-btn').addEventListener('click', () => {
+    _sel('tab-discover').click(); // Switch explicitly to Discover tab globally
+    const tp = _sel('ticket-portal');
+    if (tp && tp.getAttribute('aria-hidden') === 'false') {
+      tp.style.transition = 'none';
+      tp.style.opacity = '0';
+      tp.setAttribute('aria-hidden', 'true');
+      setTimeout(() => { tp.style.transition = ''; tp.style.opacity = ''; }, 50);
+      _sel('landing-portal').setAttribute('aria-hidden', 'false');
+    }
+  });
+
+  _sel('home-brand-btn').addEventListener('click', () => {
+    localStorage.removeItem('venueUser');
+    location.reload();
+  });
+  
   _sel('logout-btn').addEventListener('click', () => {
     localStorage.removeItem('venueUser');
     location.reload();
+  });
+  
+  _sel('back-events-btn').addEventListener('click', () => {
+    ticketPortal.style.opacity = '0';
+    setTimeout(() => {
+      ticketPortal.setAttribute('aria-hidden', 'true');
+      ticketPortal.style.opacity = '';
+      _sel('landing-portal').setAttribute('aria-hidden', 'false');
+    }, 400);
   });
   
   _sel('auth-btn').addEventListener('click', attemptAuth);
@@ -71,7 +276,7 @@ function init() {
     splash.style.opacity = '0';
     setTimeout(() => {
       splash.setAttribute('aria-hidden', 'true');
-      checkSession();
+      _sel('landing-portal').setAttribute('aria-hidden', 'false');
     }, 400);
   }, 1200);
 }
@@ -83,8 +288,11 @@ function attemptAuth() {
   if (data.tickets[id]) {
     localStorage.setItem('venueUser', id);
     ticketPortal.style.opacity = '0';
+    _sel('landing-portal').style.opacity = '0';
     setTimeout(() => {
       ticketPortal.setAttribute('aria-hidden', 'true');
+      _sel('landing-portal').setAttribute('aria-hidden', 'true');
+      _sel('landing-portal').style.opacity = '';
       loadUserContext(id);
     }, 400);
   } else {
@@ -94,14 +302,22 @@ function attemptAuth() {
 
 function checkSession() {
   const saved = localStorage.getItem('venueUser');
-  if (saved && data.tickets[saved]) {
+  if (saved && data && data.tickets && data.tickets[saved]) {
     loadUserContext(saved);
+    const portal = _sel('landing-portal');
+    portal.style.opacity = '0';
+    setTimeout(() => {
+        portal.setAttribute('aria-hidden', 'true');
+        portal.style.opacity = '';
+    }, 400);
   } else {
+    ticketPortal.style.opacity = '';
     ticketPortal.setAttribute('aria-hidden', 'false');
   }
 }
 
 function loadUserContext(ticketId) {
+  _sel('app-core').style.display = 'flex';
   currentUserContext = data.tickets[ticketId];
   document.body.className = `role-${currentUserContext.role}`;
   _sel('user-greeting').textContent = `Hi, ${currentUserContext.name.split(' ')[0]}`;
